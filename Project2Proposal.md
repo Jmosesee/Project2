@@ -25,7 +25,7 @@ The brower extension will use the chrome.webRequest API to observe the search re
 
 #### Entering skills via context menu
 The browser extension will add two new options to the context menu (accessed with a right mouse click): "I have this skill," and, "I don't have this skill." As the user is reviewing a job listing, they can select any word or phrase in the listing and then choose, "I have this skill," or, "I don't have this skill."  The extension will forward the selected word or phrase through the Flask API to the appropriate list in the Mongo DB.  These lists will be used in several ways as explained below.  Here is an example of how the context menu might appear:
-![alt text](Context menu example.PNG "Context menu example")
+![alt text](/Context%20menu%20example.PNG "Context menu example")
 
 
 #### Scraping www.indeed.com
@@ -45,7 +45,7 @@ Similarly, pandas will also use this table to identify, of the skills in the, "S
 ### Outputs
 #### Skill phrase highlighting
 Skills selected by the user via the browser extension context menu will be collected into two lists stored in the Mongo DB: "Skills I have," and, "Skills I don't have."  Whenever the user is browsing Indeed.com, the browser extension will then find these words or phrases in each job listing as it is displayed, and highlight these skills, in green, for, "Skills I have," or in red, for, "Skills I don't have."  Here is an example of how the highlighting for, "Skills I have," might appear:
-![alt text](Highlighting example.PNG "Highlighting example")
+![alt text](/Highlighting%20example.PNG "Highlighting example")
 
 #### Locally hosted web page
 ##### Most relevant listings
