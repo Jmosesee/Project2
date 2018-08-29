@@ -1,0 +1,25 @@
+{
+  "name": "Enhanced Job Search",
+  "version": "1.0",
+  "description": "DA Bootcamp Project 2",
+  "permissions": [
+    "contextMenus", 
+    "webRequest",
+    "http://localhost/*",
+    "*://www.indeed.com/*"
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ],
+    "persistent": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.indeed.com/*"],
+      "run_at": "document_idle",
+      "js": ["contentScript.js"]
+    }
+  ],
+   "manifest_version": 2
+}
