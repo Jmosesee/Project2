@@ -122,28 +122,28 @@
     }
   }
   // first run
-  var myRequest = new Request('http://localhost:5000/get/');
-  fetch(myRequest)  
-  .then(response => {
-    if (response.status === 200) {
-      return response.json();
-    } else {
-      throw new Error('Something went wrong on api server!');
-    }
-  })
-  .then(function(data) {
-    console.log("Adding new keywords");
-    data.forEach(d => {
-      keywords.push(d.name);
-    })
-    console.log(keywords);
-  }).catch(error => {
-    console.error(error);
-  })
-  .then(function(data){
-    console.log("Applying highlights");
-    THmo_doHighlight(document.body);
-  })
+//   var myRequest = new Request('http://localhost:5000/get/');
+//   fetch(myRequest)  
+//   .then(response => {
+//     if (response.status === 200) {
+//       return response.json();
+//     } else {
+//       throw new Error('Something went wrong on api server!');
+//     }
+//   })
+//   .then(function(data) {
+//     console.log("Adding new keywords");
+//     data.forEach(d => {
+//       keywords.push(d.name);
+//     })
+//     console.log(keywords);
+//   }).catch(error => {
+//     console.error(error);
+//   })
+//   .then(function(data){
+//     console.log("Applying highlights");
+//     THmo_doHighlight(document.body);
+//   })
 })();
 
 

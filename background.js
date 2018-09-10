@@ -13,16 +13,17 @@ chrome.runtime.onInstalled.addListener(function() {
 
 chrome.contextMenus.onClicked.addListener(onClickHandler);
 
+base_url = 'http://18.221.162.164:8080'
 function onClickHandler(info, tab) {
   var sText = info.selectionText;
 
   console.log(info.menuItemId);
   switch (info.menuItemId) {
     case "do-have":
-      var myRequest = new Request('http://localhost:5000/do-have/' + sText);
+      var myRequest = new Request(base_url + '/do-have/' + sText);
       break;
     case "dont-have":
-      var myRequest = new Request('http://localhost:5000/dont-have/' + sText);
+      var myRequest = new Request(base_url + '/dont-have/' + sText);
       break;
   }
   fetch(myRequest);
@@ -63,10 +64,11 @@ const networkFilters = {
 chrome.webRequest.onBeforeRequest.addListener((details) => {
     var parser = document.createElement('a');
     parser.href = details.url;
-    console.log(parser.search);
-    var myRequest = new Request('http://localhost:5000/jobs' + parser.search);
+    url = base_url + '/jobs/' + parser.search;
+    var myRequest = new Request(url);
     fetch(myRequest)  
       .then(response => {
+        console.log("Fetching");
         if (response.status === 200) {
           return response.text();
         } else {
@@ -74,7 +76,8 @@ chrome.webRequest.onBeforeRequest.addListener((details) => {
         }
       }).then(function(data) {
         console.log(data);
-      }).catch(error => {
+      })
+      .catch(error => {
         console.error(error);
       })
       
