@@ -13,7 +13,7 @@ chrome.runtime.onInstalled.addListener(function() {
 
 chrome.contextMenus.onClicked.addListener(onClickHandler);
 
-base_url = 'http://18.191.181.111:8080'
+base_url = 'http://18.220.129.126:8080'
 function onClickHandler(info, tab) {
   var sText = info.selectionText;
 
