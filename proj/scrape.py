@@ -21,7 +21,7 @@ def get_job_links_page(query, constraints, page):
 
     # Build a url to query Indeed
     url = base_url + 'q=' + query + '&' + constraints + '&start=' + str(10 * (page-1))
-    print(url)
+    # print(url)
 
     page = requests.get(url, headers=headers)
     soup = BeautifulSoup(page.text, "html.parser")
@@ -30,7 +30,7 @@ def get_job_links_page(query, constraints, page):
     # The code below scrapes this number from the html and assigns it to the found_jobs variabl
     search_count = soup.find(id="searchCount").get_text()
     found_jobs = list(map(int, re.findall('\d+', search_count.replace(',', ''))))[1]
-    print("Found " + str(found_jobs) + " jobs")
+    # print("Found " + str(found_jobs) + " jobs")
     # build a list of job links
     some_links = []
     ids = []
@@ -71,8 +71,8 @@ def get_job_links_page(query, constraints, page):
     job_links = ["https://www.indeed.com{}".format(x)
              for x in some_links
              ]
-    print (len(job_links))
-    print (job_links[0])
+    # print (len(job_links))
+    # print (job_links[0])
     return (job_links, found_jobs, ids)
 
 # def get_job_links():
