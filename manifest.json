@@ -6,7 +6,9 @@
     "contextMenus", 
     "webRequest",
     "http://localhost/*",
-    "*://www.indeed.com/*"
+    "*://www.indeed.com/*",
+    "identity",
+    "identity.email"
   ],
   "background": {
     "scripts": [
@@ -21,5 +23,6 @@
       "js": ["contentScript.js"]
     }
   ],
+
    "manifest_version": 2
 }

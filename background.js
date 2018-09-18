@@ -13,6 +13,10 @@ chrome.runtime.onInstalled.addListener(function() {
 
 chrome.contextMenus.onClicked.addListener(onClickHandler);
 
+chrome.identity.getProfileUserInfo(function(userInfo) {
+  console.log(JSON.stringify(userInfo));
+});
+
 base_url = 'http://18.220.129.126:8080'
 function onClickHandler(info, tab) {
   var sText = info.selectionText;
@@ -26,6 +30,8 @@ function onClickHandler(info, tab) {
       var myRequest = new Request(base_url + '/dont-have/' + sText);
       break;
   }
+
+  console.log(myRequest)
   fetch(myRequest);
   // chrome.storage.local.get(['keywords'], function(result) {
   //   console.log('Value is ' + result.keywords);
