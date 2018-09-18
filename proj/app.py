@@ -14,25 +14,23 @@
 # 8: Enter the following command to start the Flask app:
 #    $ python3 app.py
 
+# Todo: Can we create a boot script that will do the above whenever our virtual machine boots?
+
 # Here we have a Flask app and a Celery worker in the same file.
 # The two processes have access to the variable names defined globally here
 # However, they do not share memory, so they are using two different copies of those variables!
 
 # Todo: Find a way to simplify the above architecture.
-# Todo: Can we create a boot script that will do the above whenever our virtual machine boots?
 # Todo: Create a readme file for this project
-# Todo: Use Github to manage this code
-# Todo: Consider separating the DynamoDB interface into a new module
 # Todo: Consider applying OOP principles
 
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, request, render_template
 from flask_cors import CORS
 import boto3
 from flask_celery import make_celery
 from urllib.parse import parse_qs, urlencode
 import datetime
 import pandas as pd
-from collections import defaultdict
 from dynamodb_json import json_util as json
 
 from scrape import get_job_links_page, get_job
@@ -77,17 +75,18 @@ def put_skill(skill, have):
     skill_table.put_item(Item=sk)
     return 'Inserted: ' + skill
     
-# The return value for these routes is not being used for anything.  Feel free to change it to something useful
-@flask_app.route("/do-have/<skill>")
-def do_have(skill):
-    # global analysis_df
-    
+def add_skill_I_have(skill):
     # Todo: consider functionizing the next 3 lines of code
     r = put_skill(skill, True)
     # Todo: How long does reanalyzing take?  Should it be handled by celery?
-    #analysis_df[skill] = reanalyze(analysis_df, skill, jobs_table, analysis_table)
     reanalyze(skill, jobs_table, analysis_table)
-    scrape.delay(skill, skills)
+    scrape.delay(skill, skills.to_json())
+    return r
+    
+# The return value for these routes is not being used for anything.  Feel free to change it to something useful
+@flask_app.route("/do-have/<skill>")
+def do_have(skill):
+    r = add_skill_I_have(skill)    
     return r
 
 @flask_app.route("/dont-have/<skill>")
@@ -97,17 +96,9 @@ def dont_have(skill):
 # This route is used to capture the search constraints
 @flask_app.route("/jobs/")
 def jobs():
-    # global analysis_df
-    
     constraints = {k: v for k,v in request.args.items()}
     skill = constraints.pop('q')
-    # Todo: consider functionizing the next 3 lines of code
-    r = put_skill(skill, True)
-    # Todo: How long does reanalyzing take?  Should it be handled by celery?
-    # analysis_df[skill] = reanalyze(analysis_df, skill, jobs_table, analysis_table)
-    # analysis_df.append(scrape.delay(skill, skills.to_json()))
-    reanalyze(skill, jobs_table, analysis_table)
-    scrape.delay(skill, skills.to_json())
+    r = add_skill_I_have(skill)    
     # after popping q from a, the remaining parameters are the constraints
     # Todo: Also need to strip the start page
     encoded = urlencode(constraints)
