@@ -56,7 +56,8 @@
 
 (function() { // anonymous function wrapper, used for error checking & limiting scope
   'use strict';
-  var keywords = [];
+  var do_have_skill = [];
+  var dont_have_skill = [];
   
   // if (window.self !== window.top) { return; } // end execution if in a frame
   
@@ -86,14 +87,22 @@
   // Main workhorse routine
   function THmo_doHighlight(el){
         
-    if(!keywords)  { return; }  // end execution if not found
-    var highlightStyle = "color:#00f; font-weight:bold; background-color: #0f0;"
-    
+    if(!do_have_skill)  { return; }  // end execution if not found
+    var do_haveStyle = "color:#00f; font-weight:bold; background-color: #0f0;"
+    var dont_haveStyle = "color:#fcc; font-weight:bold; background-color: #f00;"
     var rQuantifiers = /[-\/\\^$*+?.()|[\]{}]/g;
     //keywords = keywords.replace(rQuantifiers, '\\$&').split(',').join('|');
-    var joined_keywords = keywords.join('|');
-    console.log(joined_keywords);
-    var pat = new RegExp('(' + joined_keywords + ')', 'gi');
+
+    var modified_do_have = []
+    var modified_dont_have = []
+    do_have_skill.forEach(s => modified_do_have.push('[' + s[0].toUpperCase() + s[0].toLowerCase() + ']' + s.slice(1) + String.raw`[^\w]`));   
+    dont_have_skill.forEach(s => modified_dont_have.push('[' + s[0].toUpperCase() + s[0].toLowerCase() + ']' + s.slice(1) + String.raw`[^\w]`));   
+    console.log(modified_do_have)
+    var joined_do_have_skill = modified_do_have.join('|');
+    var joined_dont_have_skill = modified_dont_have.join("|");
+    //console.log(joined_keywords);
+    var do_have_pat = new RegExp('(' + joined_do_have_skill + ')', 'g');
+    var dont_have_pat = new RegExp('(' + joined_dont_have_skill + ')', 'g');
     var span = document.createElement('span');
     // getting all text nodes with a few exceptions
     var snapElements = document.evaluate(
@@ -110,40 +119,53 @@
     for (var i = 0, len = snapElements.snapshotLength; i < len; i++) {
       var node = snapElements.snapshotItem(i);
       // check if it contains the keywords
-      if (pat.test(node.nodeValue)) {
+      if (do_have_pat.test(node.nodeValue) || dont_have_pat.test(node.nodeValue)) {
         // check that it isn't already highlighted
         if (node.className != "THmo" && node.parentNode.className != "THmo"){
           // create an element, replace the text node with an element
           var sp = span.cloneNode(true);
-          sp.innerHTML = node.nodeValue.replace(pat, '<span style="' + highlightStyle + '" class="THmo">$1</span>');
+          sp.innerHTML = node.nodeValue.replace(dont_have_pat, '<span style="' + dont_haveStyle + '" class="THmo">$1</span>')
+                                        .replace(do_have_pat, '<span style="' + do_haveStyle + '" class="THmo">$1</span>');
           node.parentNode.replaceChild(sp, node);
         }
       }
     }
   }
   // first run
-//   var myRequest = new Request('http://localhost:5000/get/');
-//   fetch(myRequest)  
-//   .then(response => {
-//     if (response.status === 200) {
-//       return response.json();
-//     } else {
-//       throw new Error('Something went wrong on api server!');
-//     }
-//   })
-//   .then(function(data) {
-//     console.log("Adding new keywords");
-//     data.forEach(d => {
-//       keywords.push(d.name);
-//     })
-//     console.log(keywords);
-//   }).catch(error => {
-//     console.error(error);
-//   })
-//   .then(function(data){
-//     console.log("Applying highlights");
-//     THmo_doHighlight(document.body);
-//   })
+  // Todo: Keep the skills list updated as the user adds new skills
+  function getKeywords(){
+    var myRequest = new Request('https://18.220.129.126:8080/get-skills/');
+    fetch(myRequest)  
+    .then(response => {
+      if (response.status === 200) {
+        return response.json();
+      } else {
+        throw new Error('Something went wrong on api server!');
+      }
+    })
+    .then(function(data) {
+      console.log("Adding new keywords");
+      do_have_skill = [];
+      dont_have_skill = [];
+      data.forEach(d => {
+        if (d.have){
+          do_have_skill.push(d.skill_name);
+        } else {
+          dont_have_skill.push(d.skill_name);
+        }
+      })
+      console.log(dont_have_skill);
+    }).catch(error => {
+      console.error(error);
+    })
+    .then(function(data){
+      if ((do_have_skill.length > 0) && (dont_have_skill.length > 0)) {
+        console.log("Applying highlights");
+        THmo_doHighlight(document.body);
+      }
+    })
+  }
+  getKeywords();
 })();
 
 
