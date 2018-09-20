@@ -3,7 +3,7 @@
     let Table = document.getElementById("ranked-table");
     let old_tbody = document.getElementById("ranked-tbody");
 
-    fetch('https://18.220.129.126:8080/get-top-jobs/')
+    fetch('https://18.191.252.14:8080/get-top-jobs/')
       .then(function(response) {
         return response.json();
       })
@@ -23,7 +23,7 @@
                     </h2>
                     <h3 class="company">${top_jobs['company'][row]}</h3>
                     <h4 class="location">${top_jobs['location'][row]}</h4>
-                    <div class="summary">${top_jobs['job_summary'][row].slice(0, 300)}...</div>`;
+                    <div class="summary">${top_jobs['job_summary'][row].slice(0, 200)}...</div>`;
                 rowNumber += 1;
             }
        }
