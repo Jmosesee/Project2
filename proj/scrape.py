@@ -21,7 +21,7 @@ def get_job_links_page(query, constraints, page):
 
     # Build a url to query Indeed
     url = base_url + 'q=' + query + '&' + constraints + '&start=' + str(10 * (page-1))
-    print(url)
+    # print(url)
 
     page = requests.get(url, headers=headers)
     soup = BeautifulSoup(page.text, "html.parser")
@@ -30,7 +30,7 @@ def get_job_links_page(query, constraints, page):
     # The code below scrapes this number from the html and assigns it to the found_jobs variabl
     search_count = soup.find(id="searchCount").get_text()
     found_jobs = list(map(int, re.findall('\d+', search_count.replace(',', ''))))[1]
-    print("Found " + str(found_jobs) + " jobs")
+    # print("Found " + str(found_jobs) + " jobs")
     # build a list of job links
     some_links = []
     ids = []
@@ -71,8 +71,8 @@ def get_job_links_page(query, constraints, page):
     job_links = ["https://www.indeed.com{}".format(x)
              for x in some_links
              ]
-    print (len(job_links))
-    print (job_links[0])
+    # print (len(job_links))
+    # print (job_links[0])
     return (job_links, found_jobs, ids)
 
 # def get_job_links():
@@ -89,10 +89,11 @@ def get_job_links_page(query, constraints, page):
 
 # Scrape the details of one job from Indeed
 def get_job(link):
-    attempts = 0
+    outer_attempts = 0
     
     # I don't know why this sometimes fails on the first try, but retrying seems to succeed.
-    while attempts < 3:
+    # Todo: Maybe the div class names are different sometimes
+    while outer_attempts < 3:
         try:
             response = requests.get(link, headers=headers)
             soup = BeautifulSoup(response.text, "html.parser")
@@ -101,15 +102,42 @@ def get_job(link):
             company = subtitle_divs[0].get_text()
             location = subtitle_divs[-1].get_text()
             job_summary = soup.find(class_="jobsearch-JobComponent-description").get_text()
+            inner_attempts = 0
+            while inner_attempts < 5:
+                inner_attempts += 1
+                try:
+                    desired =  [e.get_text() for e in soup.find_all(class_="jobsearch-DesiredExperience-item")]
+                    if desired:
+                        if (inner_attempts==1):
+                            desired_text = soup.find(class_="jobsearch-DesiredExperience").get_text()
+                            job_summary = job_summary[len(desired_text):]
+                        break
+                    else:
+                        raise Error('Zero found')
+                except:
+                    try:
+                        desired = [e.get_text() for e in soup.find_all(class_="experienceListItem")]
+                        if desired:
+                            if inner_attempts==1:
+                                desired_text = soup.find(class_="v2Experience").get_text()
+                                job_summary = job_summary[len(desired_text):]
+                            break
+                    except:
+                        response = requests.get(link, headers=headers)
+                        soup = BeautifulSoup(response.text, "html.parser")
+                        
             break
         except :
-            attempts += 1
+            outer_attempts += 1
             jobtitle = "Not Available"
             company = "Not Available"
             location = "Not Available"
             job_summary = "Not Available"
+            desired = []
 
     return {'job_summary': job_summary,
             'company': company,
             'location': location,
-            'jobtitle': jobtitle}
+            'jobtitle': jobtitle,
+            'desired': desired
+            }
