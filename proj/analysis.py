@@ -1,5 +1,3 @@
-# Todo: There should be a boot script that will read data from the DB into memory
-
 import pandas as pd
 from nltk.tokenize import word_tokenize
 from collections import defaultdict
@@ -39,21 +37,34 @@ def analyze(job, skills, analysis_table):
     return tallied_skill_mentions
 
 def reanalyze(skill, jobs_table, analysis_table):
-    # analysis_df is local
-    analysis_df = pd.DataFrame(json.loads(analysis_table.scan()['Items'])).fillna(False)
-    reanalysis = []
+    #Todo: also need to reanalyze jobs in jobs_table_queue
+    analysis_response = analysis_table.scan()['Items']
     with analysis_table.batch_writer() as batch:
-        for index, row in analysis_df.iterrows():
-            response = jobs_table.get_item(Key={'JobId': index})
-            job_summary = response['Item']['job_summary']
-            job_title = response['Item']['job_summary']
-            #Todo: also need to reanalyze jobs in jobs_table_queue
-            if type(job_summary) == str:
-                tallied_skill_mentions = tally_skill_mentions_in_job(job_summary, job_title, [skill])[skill]
-            else:
-                tallied_skill_mentions = 0
-            reanalysis.append(tallied_skill_mentions)
-            table_item = tallied_skill_mentions.copy()  # Shallow copy!  (Deep copy would be fine too)
-            table_item['JobId'] = index
-            batch.put_item(Item=table_item)
-    return reanalysis
+        # Go through the whole analysis table in the database and find each of its jobs in the job table and reanalyze it
+        for table_item in analysis_response:
+            try: 
+                response = jobs_table.get_item(Key={'JobId': table_item['JobId']})
+                job_summary = response['Item']['job_summary']
+                job_title = response['Item']['job_summary']
+                if type(job_summary) == str:
+                    tallied_skill_mentions = tally_skill_mentions_in_job(job_summary, job_title, pd.DataFrame({"skill_name": [skill], "have": [True]}))[skill]
+                else:
+                    tallied_skill_mentions = 0
+                table_item[skill] = tallied_skill_mentions
+                batch.put_item(Item = table_item)
+            except ClientError:
+                pass
+        # Then go through the queue of jobs waiting to be written to the jobs table and reanalyze them too
+        # for j in jobs_table_queue:
+        #     id = j['JobId']
+        #     job_summary = j['job_summary']
+        #     job_title = j['job_title']
+        #     if type(job_summary) == str:
+        #         tallied_skill_mentions = tally_skill_mentions_in_job(job_summary, job_title, pd.DataFrame({"skill_name": [skill], "have": [True]}))[skill]
+        #     else:
+        #         tallied_skill_mentions = 0
+        #     # Find the existing analyzsis for that job
+        #     response = analysis_table.get_item(Key={'JobId': id})
+        #     response['Item'][skill] = tallied_skill_mentions
+        #     batch.put_item(Item = response['Item'])
+          

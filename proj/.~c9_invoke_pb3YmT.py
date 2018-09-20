@@ -2,14 +2,14 @@
 # This video is very helpful in understanding this: https://www.youtube.com/watch?v=iwxzilyxTbQ
 # To get this running follow these steps:
 # 1: Open a terminal window
-# 2: If you are using the PythonData environment, enter the following command to activate it:
+# 2: Enter the following command to activate the PythonData environment:
 #    $ source activate PythonData
 # 3. Navigate into the project folder
 # 4. Enter the following command to start the Celery worker and beat:
-#    $ celery -A app.celery worker --loglevel=info 
+#    $ celery -A app.celery worker --loglevel=info -B
 # 5: Open a second terminal window
 # 6. Navigate into the project folder
-# 7: If you are using the PythonData environment, enter the following command to activate it:
+# 7: Enter the following command to activate the PythonData environment in the second terminal:
 #    $ source activate PythonData
 # 8: Enter the following command to start the Flask app:
 #    $ python3 app.py
@@ -25,7 +25,7 @@
 # Todo: Consider applying OOP principles
 # Todo: Could skills change after being passed into a celery function?
 
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template
 from flask_cors import CORS
 import boto3
 from flask_celery import make_celery
@@ -44,7 +44,13 @@ jobs_table = dynamodb.Table('Jobs')
 jobids_table = dynamodb.Table('JobIds')
 analysis_table = dynamodb.Table('Analysis')
 
+CELERY_BEAT_PERIOD = 3.0
+PUT_JOB_BATCH_SIZE = 10
 MAX_PAGES_PER_QUERY = 10
+
+# jobs_table_queue is for use by Celery and only Celery.
+# scrape_job() appends to it and put_job() pops from it.
+jobs_table_queue = []  # This list temporarily holds scraped job data in RAM until put_job() gets around to putting it into DynamoDB
 
 flask_app = Flask(__name__)
 CORS(flask_app)
@@ -62,7 +68,7 @@ def hello():
 def put_skill(skill, have):
     global skills   # As a reminder, don't do this in a celery function, but only in flask functions.
     
-    sk = {"skill_name": skill, "have": have}
+    sk = {"skill_name": skill, "have": True}
     # print ("Before append:")
     # print (skills)
     skills = skills.append(sk, ignore_index=True)
@@ -70,7 +76,7 @@ def put_skill(skill, have):
     # print (skills)
     skill_table.put_item(Item=sk)
     return 'Inserted: ' + skill
-
+    
 def add_skill_I_have(skill):
     r = put_skill(skill, True)
     # Todo: How long does reanalyzing take?  Should it be handled by celery? 
@@ -139,10 +145,6 @@ def get_top_skills():
     trimmed_df = analysis_df.copy()
     if 'JobId' in trimmed_df.columns:
         trimmed_df = trimmed_df.drop('JobId', axis=1)
-    for index, row in skills.iterrows():
-        if not row['have']:
-            print("Dropping" + row['skill_name'])
-            trimmed_df = trimmed_df.drop(row['skill_name'], axis=1)
     skill_scores = 3 * trimmed_df.iloc[0:10].sum(axis=0)
     skill_scores += 2 * trimmed_df.iloc[10:20].sum(axis=0)
     skill_scores += 1 * trimmed_df.iloc[20:30].sum(axis=0)
@@ -150,10 +152,15 @@ def get_top_skills():
     
 @flask_app.route("/get-skills/")
 def get_skills():
-    response = skill_table.scan()
-    skills = response['Items']
+    # response = skill_table.scan()
+    # skills = response['Items']
     # print(skills)
-    return jsonify(skills)
+    return skills.to_json()
+
+# The reason for this celery beat is to avoid overloading the limited throughput capacity of our Amazon DynamoDB.
+@celery.on_after_configure.connect
+def setup_periodic_tasks(sender, **kwargs):
+    sender.add_periodic_task(CELERY_BEAT_PERIOD, put_job.s(), name='beat for put_job')
 
 # Scrape data about one job from Indeed
 @celery.task(name='app.scrape_job')
@@ -162,16 +169,29 @@ def scrape_job(id, link, json_skills):
     j = get_job(link)
     j['JobId'] = id
     j['link'] = link
-    jobs_table.put_item(Item=j)
-    # jobs_table_queue.append(j)
+    # jobs_table.put_item(Item=j)
+    jobs_table_queue.append(j)
     # print("Passing job to analyze")
     d = analyze(j, skills, analysis_table)
-
     # if len(d.keys()) == len(d.values()):
     # analysis_df.loc[id] = d
     return d
     # return pd.DataFrame(d, index=[id])
 
+#Put one job's data into the jobs table of the database
+@celery.task
+def put_job():
+    print (len(jobs_table_queue))
+
+    if len(jobs_table_queue) > 0:
+        batch_count = 0;
+        with jobs_table.batch_writer() as batch:
+            while len(jobs_table_queue) > 0 and batch_count < PUT_JOB_BATCH_SIZE:
+                j = jobs_table_queue.pop()
+                if (j):
+                    batch.put_item(Item = j)
+                    batch_count += 1
+                    
 # Scrape a list of job links by searching Indeed
 @celery.task(name='app.scrape')
 def scrape(query, json_skills):
@@ -206,7 +226,6 @@ def scrape(query, json_skills):
     # return scraped_analysis
 
 # skills is a Flask variable
-# Todo: Please explain who is using it
 skills = pd.DataFrame(json.loads(skill_table.scan()['Items'])).fillna(False)
 # Todo: Make skill_name the index
 # print(skills)
@@ -214,51 +233,6 @@ skills = pd.DataFrame(json.loads(skill_table.scan()['Items'])).fillna(False)
 #     for skill in skills.get('skill_name'):
 #         if skill not in analysis_df.columns:
 #             analysis_df[skill] = pd.Series([0] * len(analysis_df), index=analysis_df.index)
-
-# AWS limits the DynamoDB throughput.
-# At one point we were using a celery beat to meter the transfer of scraped jobs data into the database.
-# Jobs waited in memory in jobs_table_queue
-# However, this ended up being too complicated, because:
-# When the user enters a new skill, we have to reanalyze the jobs already scraped to scan them for this new skill
-# The ones that are already in the database have to be read out.
-# The reading is also throughput limited, so it should also be done by the beat.
-# The jobs in the queue to be written also need to be reanalyzed.
-# The flask app doesn't have direct access to the namespace of celery's variables, so the reanalysis of these jobs needs to be done by celery as well.
-# The new skill name to be reanalyzed needs to be passed from the Flask app to Celery.
-# Flask sends data to Celery by calling a celery function.
-# Celery functions don't execute immediately, they are deferred, by design.
-# So when Flask receives a new skill and tries to send it to Celery, Celery will meanwhile be pushing jobs, that need to be reanalyzed, from its buffer into DynamoDB,
-# only to be read back out again for reanalysis.  We don't know how to issue a priority interruption of this process for purposes of informing Celery of the new skill.
-# So at that point we gave up on the whole idea of metering our DynamoDB throughtput.
-# We solved it instead by paying AWS a small amount of money for more throughput capacity.
-
-# The reason for this celery beat is to avoid overloading the limited throughput capacity of our Amazon DynamoDB.
-# @celery.on_after_configure.connect
-# def setup_periodic_tasks(sender, **kwargs):
-#     sender.add_periodic_task(CELERY_BEAT_PERIOD, put_job.s(), name='beat for put_job')
-
-# jobs_table_queue is for use by Celery and only Celery.
-# scrape_job() appends to it and put_job() pops from it.
-# jobs_table_queue = []  # This list temporarily holds scraped job data in RAM until put_job() gets around to putting it into DynamoDB
-
-# CELERY_BEAT_PERIOD = 3.0
-# PUT_JOB_BATCH_SIZE = 10
-
-# putting_jobs = False
-# #Put job data into the jobs table of the database
-# @celery.task
-# def put_job():
-#     # Don't put any jobs into the database while we're reanalyzing
-#     print (len(jobs_table_queue))
-
-#     if len(jobs_table_queue) > 0:
-#         batch_count = 0;
-#         with jobs_table.batch_writer() as batch:
-#             while len(jobs_table_queue) > 0 and batch_count < PUT_JOB_BATCH_SIZE:
-#                 j = jobs_table_queue.pop()
-#                 if (j):
-#                     batch.put_item(Item = j)
-#                     batch_count += 1
 
 if __name__ == "__main__":
     flask_app.run(host="0.0.0.0", port=8080, ssl_context='adhoc')

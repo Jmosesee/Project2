@@ -7,15 +7,13 @@ from urllib.parse import parse_qs
 import re
 
 # Todo: consider adding a read_timeout to each requests.get() call, to avoid hanging in case of a slow response
-# Todo: consider serving Indeed's cookie
 # Fake browser visit
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.87 Safari/537.36'}
 
 # Todo: consider using keyword parameters
-# Todo: experiment with multi-word queries
 # Todo: test many combinations of constraints
 
-# Scrape one page of search results from Indeed.  Generally the retured result will be a list of ten job URL's
+# Scrape one page of search results from Indeed.  Generally the returned result will be a list of ten job URL's
 def get_job_links_page(query, constraints, page):
     base_url = "https://www.indeed.com/jobs?"
 
@@ -28,8 +26,13 @@ def get_job_links_page(query, constraints, page):
     links = soup.find_all("a")
     # For the Indeed search just executed, Indeed will report the number of jobs found.
     # The code below scrapes this number from the html and assigns it to the found_jobs variabl
-    search_count = soup.find(id="searchCount").get_text()
-    found_jobs = list(map(int, re.findall('\d+', search_count.replace(',', ''))))[1]
+    try:
+        search_count = soup.find(id="searchCount").get_text()
+        found_jobs = list(map(int, re.findall('\d+', search_count.replace(',', ''))))[1]
+        print (search_count)
+    except:
+        print ("Failed to read searchCount")
+        found_jobs = 0
     # print("Found " + str(found_jobs) + " jobs")
     # build a list of job links
     some_links = []
@@ -85,8 +88,6 @@ def get_job_links_page(query, constraints, page):
 #     id = [p.get('https://www.indeed.com/rc/clk?jk')[0] for p in parsed]
 #     return id
 
-# get_job_links_page(1)
-
 # Scrape the details of one job from Indeed
 def get_job(link):
     outer_attempts = 0
@@ -125,6 +126,7 @@ def get_job(link):
                     except:
                         response = requests.get(link, headers=headers)
                         soup = BeautifulSoup(response.text, "html.parser")
+                        desired = []
                         
             break
         except :
