@@ -5,7 +5,7 @@
   "permissions": [
     "contextMenus", 
     "webRequest",
-    "http://localhost/*",
+    "*://18.220.129.126/*",
     "*://www.indeed.com/*"
   ],
   "background": {
@@ -16,7 +16,9 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.indeed.com/*"],
+      "matches": ["https://www.indeed.com/*",
+                  "*://18.220.129.126/*"
+      ],
       "run_at": "document_idle",
       "js": ["contentScript.js"]
     }
