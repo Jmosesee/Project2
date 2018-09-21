@@ -54,12 +54,14 @@
   1.0 Initial release
 */
 
+var replacements = 0;
+
 (function() { // anonymous function wrapper, used for error checking & limiting scope
   'use strict';
   var do_have_skill = [];
   var dont_have_skill = [];
   
-  // if (window.self !== window.top) { return; } // end execution if in a frame
+  if (window.self !== window.top) { return; } // end execution if in a frame
   
   // setUserPref(
   // 'highlightStyle',
@@ -88,6 +90,8 @@
   function THmo_doHighlight(el){
         
     if(!do_have_skill)  { return; }  // end execution if not found
+    if(do_have_skill.length < 1)  { return; }  // end execution if not found
+    
     var do_haveStyle = "color:#00f; font-weight:bold; background-color: #0f0;"
     var dont_haveStyle = "color:#fcc; font-weight:bold; background-color: #f00;"
     var rQuantifiers = /[-\/\\^$*+?.()|[\]{}]/g;
@@ -95,8 +99,21 @@
 
     var modified_do_have = []
     var modified_dont_have = []
-    do_have_skill.forEach(s => modified_do_have.push('[' + s[0].toUpperCase() + s[0].toLowerCase() + ']' + s.slice(1) + String.raw`[^\w]`));   
-    dont_have_skill.forEach(s => modified_dont_have.push('[' + s[0].toUpperCase() + s[0].toLowerCase() + ']' + s.slice(1) + String.raw`[^\w]`));   
+
+    // Single letter skills should be case sensitive
+    // All other skills should be case sensitive except insensitive for the first letter
+    function buildRegex(s){
+      if (s.length > 1) {
+        return '[' + s[0].toUpperCase() + s[0].toLowerCase() + ']' + s.slice(1) + String.raw`[^\w]`
+      } else {
+        return s + String.raw`[^\w]`
+      }
+    }
+    // do_have_skill.forEach(s => modified_do_have.push(((s.length>1) ? ('[' + s[0].toUpperCase() + s[0].toLowerCase() + ']') : s[0]) + s.slice(1) + String.raw`[^\w]`));   
+    // dont_have_skill.forEach(s => modified_dont_have.push('[' + s[0].toUpperCase() + s[0].toLowerCase() + ']' + s.slice(1) + String.raw`[^\w]`));   
+    modified_do_have = do_have_skill.map(buildRegex);
+    modified_dont_have = dont_have_skill.map(buildRegex);
+
     // console.log(modified_do_have)
     var joined_do_have_skill = modified_do_have.join('|');
     var joined_dont_have_skill = modified_dont_have.join("|");
@@ -117,15 +134,31 @@
         el, null, XPathResult.UNORDERED_NODE_SNAPSHOT_TYPE, null);
     
     if (!snapElements.snapshotItem(0)) { return; }  // end execution if not found
+    // console.log(dont_have_skill.length);
+    // for (let j = 0; j < dont_have_skill.length; j++) {
+    //   console.log(dont_have_skill[j])
+    // }
+    //console.log("do_have_pat: " + do_have_pat);
+    // console.log("dont_have_skill.length: " + dont_have_skill.length);
+    console.log("dont_have_pat: " + dont_have_pat);
     for (var i = 0, len = snapElements.snapshotLength; i < len; i++) {
       var node = snapElements.snapshotItem(i);
       // check if it contains the keywords
       // console.log("Checking node")
-      if (do_have_pat.test(node.nodeValue) || dont_have_pat.test(node.nodeValue)) {
-        //console.log("Found match")
+      // if (do_have_pat.test(node.nodeValue)) {
+      if (do_have_pat.test(node.nodeValue) || ((dont_have_skill.length > 0) && (dont_have_pat.test(node.nodeValue)))) {
+        // console.log("Found match")
         // check that it isn't already highlighted
         if (node.className != "THmo" && node.parentNode.className != "THmo"){
-          //console.log("Replacing text")
+          // console.log("Replacing text")
+          replacements++;
+          // if (replacements > 475){
+          //   console.log(node.nodeValue)
+          // }
+          // Last resort protection from infinite loop
+          if (replacements > 2000){
+            break;
+          }
           // create an element, replace the text node with an element
           var sp = span.cloneNode(true);
           let modified_string = node.nodeValue;
@@ -140,7 +173,6 @@
     }
   }
   // first run
-  // Todo: Keep the skills list updated as the user adds new skills
   function getKeywords(){
     var myRequest = new Request('https://18.220.129.126:8080/get-skills/');
     fetch(myRequest)  
@@ -167,12 +199,15 @@
       console.error(error);
     })
     .then(function(data){
-      if ((do_have_skill.length > 0) || (dont_have_skill.length > 0)) {
-        // console.log("Applying highlights");
+      console.log("do_have: " + do_have_skill.length.toString())
+      console.log("dont_have: " + dont_have_skill.length.toString())
+      if (do_have_skill.length > 0) {
+        console.log("Applying highlights");
         THmo_doHighlight(document.body);
       }
     })
   }
+  console.log("Getting Keywords")
   getKeywords();
 })();
 
