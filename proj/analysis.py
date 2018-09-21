@@ -14,7 +14,10 @@ def tally_skill_mentions_in_job(job_summary, job_title, skills):
     for index, row in skills.iterrows():
         s = row['skill_name']
         # print (s)
-        pattern = re.compile(s + r'[^\w]', flags=re.I)
+        if len(s) > 1:
+            pattern = re.compile('[' + s[0].upper() + s[0].lower() + ']' + s[1:] + r'[^\w]')
+        else:
+            pattern = re.compile(s + r'[^\w]')
         # print (pattern)
         skill_dict[s] = len(re.findall(pattern, job_title)) + len(re.findall(pattern, job_summary))
     
@@ -33,7 +36,7 @@ def analyze(job, skills, analysis_table):
         analysis_table.put_item(Item=table_item)
     else:
         tallied_skill_mentions = defaultdict(int)
-    print (tallied_skill_mentions)
+    # print (tallied_skill_mentions)
     return tallied_skill_mentions
 
 def reanalyze(skill, jobs_table, analysis_table):

@@ -28,7 +28,7 @@ function populateTable() {
                 panel.appendChild(panel_heading);
                 
                 let panel_title = document.createElement("h4");
-                panel_title.setAttribute("class", "panel_title");
+                panel_title.setAttribute("class", "panel-title");
                 // Todo: consider breaking this down
                 panel_title.innerHTML = `<a href=${top_jobs['link'][row]} target="_blank">${top_jobs['jobtitle'][row]}</a>`;
                 panel_heading.appendChild(panel_title);
@@ -83,42 +83,4 @@ function populateTable() {
   
 }
 
-function buildCharts() {
-    fetch('https://18.220.129.126:8080/get-top-skills/')
-      .then(function(response) {
-        return response.json();
-      })
-      .then(function(top_skills) {
-        delete top_skills['Score']
-        
-        var sortable = [];
-        for (var s in top_skills) {
-            sortable.push([s, top_skills[s]]);
-        }
-        
-        let sorted = sortable.sort(function(a, b) {
-            return b[1] - a[1];
-        });
-
-        let skills = [];
-        let scores = [];
-        for (s in sorted){
-            skills.push(sorted[s][0]);
-            scores.push(sorted[s][1]);
-        }
-        var data = [{
-            x: skills,
-            y: scores,
-            type: 'bar'
-        }];
-          
-        var layout = {
-            height: 400,
-            width: 500
-        };
-        Plotly.newPlot('do-have-chart', data, layout);
-      })
-}
-
 populateTable();
-buildCharts();

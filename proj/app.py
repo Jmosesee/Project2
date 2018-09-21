@@ -44,7 +44,7 @@ jobs_table = dynamodb.Table('Jobs')
 jobids_table = dynamodb.Table('JobIds')
 analysis_table = dynamodb.Table('Analysis')
 
-MAX_PAGES_PER_QUERY = 10
+MAX_PAGES_PER_QUERY = 7
 
 flask_app = Flask(__name__)
 CORS(flask_app)
@@ -58,6 +58,28 @@ celery = make_celery(flask_app)
 def hello():
     # return 'Hello, World!'
     return render_template('index.html', name=None)
+
+@flask_app.route("/delete-skill/<skill>")
+def delete_skill(skill):
+    global skills
+    try:
+        del skills[skill]
+    except:
+        pass
+    skill_table.delete_item(Key={'skill_name': skill})
+    jobs = jobids_table.scan()['Items']
+    
+    for job in jobs:
+        print (job['JobId'])
+        print (skill)
+        analysis_table.update_item(
+            Key={'JobId': job['JobId']},
+            UpdateExpression='remove ' + skill)
+    return "OK"
+
+@flask_app.route('/show-skills/')
+def show_skills():
+    return render_template('skills.html', name=None)
 
 def put_skill(skill, have):
     global skills   # As a reminder, don't do this in a celery function, but only in flask functions.
@@ -88,6 +110,7 @@ def do_have(skill):
 
 @flask_app.route("/dont-have/<skill>")
 def dont_have(skill):
+    reanalyze(skill, jobs_table, analysis_table)
     return put_skill(skill, False)
 
 # This route is used to capture the search constraints
@@ -105,9 +128,18 @@ def jobs():
 
 # Todo: Negate the scrore for skills where "have" is false
 def sort_jobs(df):
+    skill_dict = {}
+    skills = skill_table.scan()['Items']
+    for s in skills:
+        skill_dict[s['skill_name']] = s['have']
     if 'Score' in df.columns:
         df.drop('Score', axis=1)
+    for col in df.columns:
+        if not col=='JobId':
+            if not skill_dict[col]:
+                df[col] = df[col].apply(lambda x: 0 - x)
     df['Score'] = df.sum(axis = 1)
+    print (df['Score'])
     return df.sort_values('Score', ascending=False)
 
 @flask_app.route("/get-top-jobs/")
@@ -141,12 +173,31 @@ def get_top_skills():
         trimmed_df = trimmed_df.drop('JobId', axis=1)
     for index, row in skills.iterrows():
         if not row['have']:
-            print("Dropping" + row['skill_name'])
-            trimmed_df = trimmed_df.drop(row['skill_name'], axis=1)
+            # print("Dropping " + row['skill_name'])
+            if row['skill_name'] in trimmed_df:
+                trimmed_df = trimmed_df.drop(row['skill_name'], axis=1)
     skill_scores = 3 * trimmed_df.iloc[0:10].sum(axis=0)
     skill_scores += 2 * trimmed_df.iloc[10:20].sum(axis=0)
     skill_scores += 1 * trimmed_df.iloc[20:30].sum(axis=0)
     return skill_scores.to_json()
+    
+@flask_app.route("/get-neg-skills/")
+def get_neg_skills():
+    analysis_df = pd.DataFrame(json.loads(analysis_table.scan()['Items'])).fillna(False)
+    analysis_df = sort_jobs(analysis_df)
+    trimmed_df = analysis_df.copy()
+    if 'JobId' in trimmed_df.columns:
+        trimmed_df = trimmed_df.drop('JobId', axis=1)
+    for index, row in skills.iterrows():
+        if row['have']:
+            # print("Dropping " + row['skill_name'])
+            if row['skill_name'] in trimmed_df:
+                trimmed_df = trimmed_df.drop(row['skill_name'], axis=1)
+    skill_scores = 3 * trimmed_df.iloc[0:10].sum(axis=0)
+    skill_scores += 2 * trimmed_df.iloc[10:20].sum(axis=0)
+    skill_scores += 1 * trimmed_df.iloc[20:30].sum(axis=0)
+    return skill_scores.to_json()
+    
     
 @flask_app.route("/get-skills/")
 def get_skills():
@@ -204,6 +255,18 @@ def scrape(query, json_skills):
     # Todo: Consider doing this earlier
     skill_table.put_item(Item=sk)
     # return scraped_analysis
+
+
+# analysis_df = pd.DataFrame(json.loads(analysis_table.scan()['Items'])).fillna(False)
+# skill_dict = {}
+# skills = skill_table.scan()['Items']
+# for s in skills:
+#     skill_dict[s['skill_name']] = s['have']
+# for col in analysis_df.columns:
+#     print(skill_dict.get(col))
+#     if not skill_dict[col]:
+#         print("Not")
+
 
 # skills is a Flask variable
 # Todo: Please explain who is using it
