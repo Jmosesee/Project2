@@ -69,21 +69,21 @@
   // );
   
   // Add MutationObserver to catch content added dynamically
-  // var THmo_MutOb = (window.MutationObserver) ? window.MutationObserver : window.WebKitMutationObserver;
-  // if (THmo_MutOb){
-  //   var THmo_chgMon = new THmo_MutOb(function(mutationSet){
-  //     mutationSet.forEach(function(mutation){
-  //       for (var i=0; i<mutation.addedNodes.length; i++){
-  //         if (mutation.addedNodes[i].nodeType == 1){
-  //           THmo_doHighlight(mutation.addedNodes[i]);
-  //         }
-  //       }
-  //     });
-  //   });
-  //   // attach chgMon to document.body
-  //   var opts = {childList: true, subtree: true};
-  //   THmo_chgMon.observe(document.body, opts);
-  // }
+  var THmo_MutOb = (window.MutationObserver) ? window.MutationObserver : window.WebKitMutationObserver;
+  if (THmo_MutOb){
+    var THmo_chgMon = new THmo_MutOb(function(mutationSet){
+      mutationSet.forEach(function(mutation){
+        for (var i=0; i<mutation.addedNodes.length; i++){
+          if (mutation.addedNodes[i].nodeType == 1){
+            THmo_doHighlight(mutation.addedNodes[i]);
+          }
+        }
+      });
+    });
+    // attach chgMon to document.body
+    var opts = {childList: true, subtree: true};
+    THmo_chgMon.observe(document.body, opts);
+  }
   // Main workhorse routine
   function THmo_doHighlight(el){
         
@@ -97,12 +97,14 @@
     var modified_dont_have = []
     do_have_skill.forEach(s => modified_do_have.push('[' + s[0].toUpperCase() + s[0].toLowerCase() + ']' + s.slice(1) + String.raw`[^\w]`));   
     dont_have_skill.forEach(s => modified_dont_have.push('[' + s[0].toUpperCase() + s[0].toLowerCase() + ']' + s.slice(1) + String.raw`[^\w]`));   
-    console.log(modified_do_have)
+    // console.log(modified_do_have)
     var joined_do_have_skill = modified_do_have.join('|');
     var joined_dont_have_skill = modified_dont_have.join("|");
     //console.log(joined_keywords);
     var do_have_pat = new RegExp('(' + joined_do_have_skill + ')', 'g');
     var dont_have_pat = new RegExp('(' + joined_dont_have_skill + ')', 'g');
+    // console.log(do_have_pat)
+    // console.log(dont_have_pat)
     var span = document.createElement('span');
     // getting all text nodes with a few exceptions
     var snapElements = document.evaluate(
@@ -115,17 +117,23 @@
         el, null, XPathResult.UNORDERED_NODE_SNAPSHOT_TYPE, null);
     
     if (!snapElements.snapshotItem(0)) { return; }  // end execution if not found
-    
     for (var i = 0, len = snapElements.snapshotLength; i < len; i++) {
       var node = snapElements.snapshotItem(i);
       // check if it contains the keywords
+      // console.log("Checking node")
       if (do_have_pat.test(node.nodeValue) || dont_have_pat.test(node.nodeValue)) {
+        //console.log("Found match")
         // check that it isn't already highlighted
         if (node.className != "THmo" && node.parentNode.className != "THmo"){
+          //console.log("Replacing text")
           // create an element, replace the text node with an element
           var sp = span.cloneNode(true);
-          sp.innerHTML = node.nodeValue.replace(dont_have_pat, '<span style="' + dont_haveStyle + '" class="THmo">$1</span>')
-                                        .replace(do_have_pat, '<span style="' + do_haveStyle + '" class="THmo">$1</span>');
+          let modified_string = node.nodeValue;
+          modified_string = modified_string.replace(do_have_pat, '<span style="' + do_haveStyle + '" class="THmo">$1</span>');
+          if (dont_have_skill.length > 0) {
+            modified_string = modified_string.replace(dont_have_pat, '<span style="' + dont_haveStyle + '" class="THmo">$1</span>');
+          }
+          sp.innerHTML = modified_string
           node.parentNode.replaceChild(sp, node);
         }
       }
@@ -144,7 +152,7 @@
       }
     })
     .then(function(data) {
-      console.log("Adding new keywords");
+      // console.log("Adding new keywords");
       do_have_skill = [];
       dont_have_skill = [];
       data.forEach(d => {
@@ -154,13 +162,13 @@
           dont_have_skill.push(d.skill_name);
         }
       })
-      console.log(dont_have_skill);
+      // console.log(do_have_skill);
     }).catch(error => {
       console.error(error);
     })
     .then(function(data){
-      if ((do_have_skill.length > 0) && (dont_have_skill.length > 0)) {
-        console.log("Applying highlights");
+      if ((do_have_skill.length > 0) || (dont_have_skill.length > 0)) {
+        // console.log("Applying highlights");
         THmo_doHighlight(document.body);
       }
     })
